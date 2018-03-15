@@ -13,6 +13,7 @@ public class ExternalSemanticError {
 	public static final Integer ERROR_WRONG_INTERFACE = 5;
 	public static final Integer ERROR_INPUT_PARAM_EMPTY = 6;
 	public static final Integer ERROR_NO_REQUIRED_PARAM = 7;
+	public static final Integer ERROR_SYSTEM_EXCEPTION = 8;
 	
 	static {
 		allErrorMsg.put(ERROR_SUCCESS, "ok");
@@ -23,6 +24,7 @@ public class ExternalSemanticError {
 		allErrorMsg.put(ERROR_WRONG_INTERFACE, "调用错误的接口");
 		allErrorMsg.put(ERROR_INPUT_PARAM_EMPTY, "输入参数为空");
 		allErrorMsg.put(ERROR_NO_REQUIRED_PARAM, "缺省必须的参数");
+		allErrorMsg.put(ERROR_SYSTEM_EXCEPTION, "系统出现异常");
 	}
 	
 	public static String get(Integer errorCode) {

@@ -22,7 +22,11 @@ public class ExternalSemanticResult {
 		/**
 		 * 打开第三方APP
 		 */
-		APP
+		APP,
+		/**
+		 * 控制
+		 */
+		CONTROL
 	}
 
 	public static enum ParamTypeEx {
