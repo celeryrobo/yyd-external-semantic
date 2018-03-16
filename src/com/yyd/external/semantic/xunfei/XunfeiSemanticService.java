@@ -98,7 +98,7 @@ public class XunfeiSemanticService implements ExternalSemanticService{
 		return semanticResult;
 	}
 	
-	private void parseResult(String result,ExternalSemanticResult semanticResult) {
+	public void parseResult(String result,ExternalSemanticResult semanticResult) {
 		if(null == result || result.isEmpty()) {
 			semanticResult.setRet(ExternalSemanticError.ERROR_INVALID_RESULT_DATA);
 			semanticResult.setMsg(ExternalSemanticError.get(ExternalSemanticError.ERROR_INVALID_RESULT_DATA));	
