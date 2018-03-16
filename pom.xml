@@ -16,7 +16,7 @@
 		<java.version>1.8</java.version>
 	</properties>
 
-<<<<<<< HEAD
+
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
@@ -45,12 +45,7 @@
     	<artifactId>commons-codec</artifactId>
     	<version>1.10</version>
 	</dependency>		
-		
-  </dependencies>
   
-  
-=======
-	<dependencies>
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
@@ -88,5 +83,5 @@
 			</plugin>
 		</plugins>
 	</build>
->>>>>>> 7df3367259e35c4ad4c4aa5a8748b4061afdaea1
+
 </project>
