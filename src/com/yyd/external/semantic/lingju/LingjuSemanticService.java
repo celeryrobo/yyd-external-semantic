@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.json.JSONException;
 
+import com.yyd.external.semantic.ExternalCommonBean;
 import com.yyd.external.semantic.ExternalSemanticError;
 import com.yyd.external.semantic.ExternalSemanticResult;
 import com.yyd.external.semantic.ExternalSemanticService;
@@ -58,6 +59,9 @@ public class LingjuSemanticService implements ExternalSemanticService{
 		result.setService("chat");
 		result.setOperation(OperationEx.SPEAK);
 		result.setParamType(ParamTypeEx.T);
+		
+		result.setData(new ExternalCommonBean());
+		result.getData().setText(result.getAnswer());
 		
 		return result;
 	}

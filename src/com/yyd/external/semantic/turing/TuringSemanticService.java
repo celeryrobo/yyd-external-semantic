@@ -10,9 +10,13 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.yyd.external.semantic.ExternalCommonBean;
 import com.yyd.external.semantic.ExternalSemanticError;
 import com.yyd.external.semantic.ExternalSemanticResult;
 import com.yyd.external.semantic.ExternalSemanticService;
+import com.yyd.external.semantic.resource.MusicResource;
+import com.yyd.external.semantic.resource.PoetryResource;
+import com.yyd.external.semantic.resource.StoryResource;
 import com.yyd.external.semantic.ExternalSemanticResult.OperationEx;
 import com.yyd.external.semantic.ExternalSemanticResult.ParamTypeEx;
 import com.yyd.external.util.Http;
@@ -144,12 +148,13 @@ public class TuringSemanticService implements ExternalSemanticService{
 		{
 			service = TuringCode.getMsg(code);
 		}
-		semanticResult.setService(service);
+		semanticResult.setService(service);//
+		semanticResult.setData(new ExternalCommonBean());
 		
 		//解析语义槽
 		JsonElement parametersElem = intentObj.get("parameters");
 		if(null != parametersElem) {
-			parsetParameters(code,parametersElem,semanticResult);
+			parseParameters(code,parametersElem,semanticResult);
 		}
 		
 		String operateState = parseString(intentObj,"operateState");
@@ -160,8 +165,7 @@ public class TuringSemanticService implements ExternalSemanticService{
 				semanticResult.setSlots(slots);
 			}
 			
-			slots.put("operateState", operateState);			
-			
+			slots.put("operateState", operateState);				
 		}
 		
 		//解析回答结果
@@ -175,10 +179,13 @@ public class TuringSemanticService implements ExternalSemanticService{
 				String text = parseString(valueObject,"text");
 				semanticResult.setAnswer(text);
 			}
-		}
+		}		
+		semanticResult.getData().setText(semanticResult.getAnswer());
 		
+		//合成返回资源数据
+		buildResource(code,operateState,semanticResult);
 		
-		
+		//设置默认操作方式和返回数据类型
 		semanticResult.setRet(ExternalSemanticError.ERROR_SUCCESS);
 		semanticResult.setMsg(ExternalSemanticError.get(ExternalSemanticError.ERROR_SUCCESS));			
 		if(semanticResult.getOperation() == null) {
@@ -189,7 +196,103 @@ public class TuringSemanticService implements ExternalSemanticService{
 	}
 	
 	
-	private void parsetParameters(String code,JsonElement parametersElem,ExternalSemanticResult semanticResult) {
+	private void buildResource(String code,String operateState,ExternalSemanticResult semanticResult) {
+		switch(code) {
+			case "200101":{
+								BuildMusicResource(operateState,semanticResult);
+								break;
+					      }
+			case "200201":{
+								BuildStoryResource(operateState,semanticResult);
+								break;
+						  }
+			case "200401":{
+								buildPoemResource(operateState,semanticResult);
+								break;
+			}			
+			default:
+				break;
+		}
+	}
+	
+	
+	private void BuildMusicResource(String operateState,ExternalSemanticResult semanticResult) {
+		Map<String,Object> slots = semanticResult.getSlots();
+		MusicResource resource = new MusicResource();
+		Object song = slots.get("song");
+		if(null != song) {
+			resource.setSong(song.toString());
+		}	
+		Object singer = slots.get("singer");
+		if(null != singer) {
+			resource.setSinger(singer.toString());
+		}
+		Object id = slots.get("id");
+		if(null != id) {
+			resource.setId((Integer)id);
+		}
+		
+		
+		resource.setUrl(semanticResult.getData().getUrl());		
+		
+		semanticResult.setResource(resource);
+	}
+	
+	private void BuildStoryResource(String operateState,ExternalSemanticResult semanticResult) {
+		Map<String,Object> slots = semanticResult.getSlots();
+		StoryResource resource = new StoryResource();
+		Object name = slots.get("storyName");
+		if(null != name) {
+			resource.setStory(name.toString());
+		}		
+		Object id = slots.get("id");
+		if(null != id) {
+			resource.setId((Integer)id);
+		}
+		
+		resource.setUrl(semanticResult.getData().getUrl());		
+		
+		semanticResult.setResource(resource);
+	}
+	
+	private void buildPoemResource(String operateState,ExternalSemanticResult semanticResult) {
+		Map<String,Object> slots = semanticResult.getSlots();
+		PoetryResource resource = new PoetryResource();
+		Object author = slots.get("poetryAuthor");
+		if(null != author) {
+			resource.setAuthorName(author.toString());
+		}		
+		Object title = slots.get("poetryTitle");
+		if(null != title) {
+			resource.setTitle(title.toString());
+		}		
+		Object dynasty = slots.get("dynasty");
+		if(null != dynasty) {
+			resource.setDynasty(dynasty.toString());//
+		}
+		
+		//返回诗文格式：诗名  朝代 作者  正文
+		//但不确定是不是所有的诗都包含这四部分内容
+		if(semanticResult.getAnswer() != null) {
+			String content = semanticResult.getAnswer();
+			String[] segs = content.split(" ");
+			if(segs.length > 1) {
+				content = segs[segs.length-1];
+				resource.setContent(content);
+			}
+			
+		}
+		
+		semanticResult.setResource(resource);
+	}
+	
+	/**
+	 * 解析返回结果听语义槽数据
+	 * @param code
+	 * @param parametersElem
+	 * @param semanticResult
+	 */
+	private void parseParameters(String code,JsonElement parametersElem,ExternalSemanticResult semanticResult) {
 		JsonObject parameterObject = parametersElem.getAsJsonObject();		
 		switch(code) {
 			case "200101":{
@@ -238,7 +341,7 @@ public class TuringSemanticService implements ExternalSemanticService{
 				
 		semanticResult.setSlots(slots);
 		semanticResult.setOperation(OperationEx.CONTROL);
-		semanticResult.setParamType(ParamTypeEx.T);
+		semanticResult.setParamType(ParamTypeEx.C);
 	}
 	
 	private void parsetMemo(JsonObject parameterObject,ExternalSemanticResult semanticResult) {
@@ -263,12 +366,12 @@ public class TuringSemanticService implements ExternalSemanticService{
 				
 		semanticResult.setSlots(slots);
 		semanticResult.setOperation(OperationEx.CONTROL);
-		semanticResult.setParamType(ParamTypeEx.T);
+		semanticResult.setParamType(ParamTypeEx.C);
 	}
 	
 	private void parsetSetting(JsonObject parameterObject,ExternalSemanticResult semanticResult) {
 		semanticResult.setOperation(OperationEx.CONTROL);
-		semanticResult.setParamType(ParamTypeEx.T);
+		semanticResult.setParamType(ParamTypeEx.C);
 	}
 	
 	private void parserAnimalSound(JsonObject parameterObject,ExternalSemanticResult semanticResult) {
@@ -285,11 +388,9 @@ public class TuringSemanticService implements ExternalSemanticService{
 		String url = urlElem.getAsString();
 		if(null == url) {
 			return;
-		}
+		}		
+		semanticResult.getData().setUrl(url);		
 		
-		Map<String,Object> slots = new HashMap<String,Object>();
-		slots.put("url", url);
-		semanticResult.setSlots(slots);		
 		semanticResult.setOperation(OperationEx.PLAY);
 		semanticResult.setParamType(ParamTypeEx.U);
 	}
@@ -301,8 +402,17 @@ public class TuringSemanticService implements ExternalSemanticService{
 		}
 		
 		String result = jsonElem.getAsString();
-		return result;
+		return result;		
+	}
+	
+	private Integer parseInt(JsonObject jsonObject,String name) {
+		JsonElement jsonElem = jsonObject.get(name);
+		if(null == jsonElem) {
+			return null;
+		}
 		
+		Integer result = jsonElem.getAsInt();
+		return result;		
 	}
 	
 	private void parserStory(JsonObject parameterObject,ExternalSemanticResult semanticResult) {
@@ -310,17 +420,23 @@ public class TuringSemanticService implements ExternalSemanticService{
 		String name = parseString(parameterObject,"name");
 		String author = parseString(parameterObject,"author");
 		String url = parseString(parameterObject,"url");
+		
+		Integer id = parseInt(parameterObject,"id");		
+		slots.put("id", id);
+		
 		if(!StringTool.isEmpty(name)) {
-			slots.put("name", name);
+			slots.put("storyName", name);
 		}
 		if(!StringTool.isEmpty(author)) {
 			slots.put("author", author);
 		}
 		if(!StringTool.isEmpty(url)) {
-			slots.put("url", url);
+			semanticResult.getData().setUrl(url);
 		}			
 		
-		semanticResult.setSlots(slots);		
+		semanticResult.setSlots(slots);	
+		semanticResult.setOperation(OperationEx.PLAY);
+		semanticResult.setParamType(ParamTypeEx.TU);
 	}
 	
 	private void parserPoem(JsonObject parameterObject,ExternalSemanticResult semanticResult) {
@@ -329,13 +445,13 @@ public class TuringSemanticService implements ExternalSemanticService{
 		String author = parseString(parameterObject,"author");
 		String name = parseString(parameterObject,"name");
 		if(!StringTool.isEmpty(name)) {
-			slots.put("name", name);
+			slots.put("poetryTitle", name);
 		}
 		if(!StringTool.isEmpty(author)) {
-			slots.put("author", author);
+			slots.put("poetryAuthor", author);
 		}
 		if(!StringTool.isEmpty(year)) {
-			slots.put("year", year);
+			slots.put("dynasty", year);
 		}			
 		
 		semanticResult.setSlots(slots);		
@@ -347,19 +463,22 @@ public class TuringSemanticService implements ExternalSemanticService{
 		String song = parseString(parameterObject,"song");
 		String singer = parseString(parameterObject,"singer");
 		String url = parseString(parameterObject,"url");
+		Integer id = parseInt(parameterObject,"id");
+		
+		slots.put("id", id);
 		if(!StringTool.isEmpty(song)) {
 			slots.put("song", song);
 		}
 		if(!StringTool.isEmpty(singer)) {
 			slots.put("singer", singer);
 		}
-		if(!StringTool.isEmpty(url)) {
-			slots.put("url", url);
+		if(!StringTool.isEmpty(url)) {			
+			semanticResult.getData().setUrl(url);
 		}			
 		
 		semanticResult.setSlots(slots);
 		semanticResult.setOperation(OperationEx.PLAY);
-		semanticResult.setParamType(ParamTypeEx.U);
+		semanticResult.setParamType(ParamTypeEx.TU);
 	}
 	
 }

@@ -26,7 +26,11 @@ public class ExternalSemanticResult {
 		/**
 		 * 控制
 		 */
-		CONTROL
+		CONTROL,
+		/**
+		 * 命令
+		 */
+		COMMAND
 	}
 
 	public static enum ParamTypeEx {
@@ -53,7 +57,16 @@ public class ExternalSemanticResult {
 		/**
 		 * 图片URL+文本+资源URL
 		 */
-		ITU		
+		ITU,	
+		
+		/**
+		 * 控制类参数
+		 */
+		C,
+		/**
+		 * 命令加文本回复
+		 */
+		TC
 	}	
 	
 	//语义处理结果(错误码)
@@ -96,6 +109,11 @@ public class ExternalSemanticResult {
 	private ParamTypeEx paramType;	
 	private String answer;	
 	
+	//data
+	private ExternalCommonBean data;
+	
+	private Object resource;
+	
 	
 	//其他
 	/**
@@ -106,6 +124,23 @@ public class ExternalSemanticResult {
 	 * 第三方外接语义返回的原始数据
 	 */
 	private String srcResult;
+	
+	public ExternalCommonBean getData() {
+		return data;
+	}
+
+	public void setData(ExternalCommonBean data) {
+		this.data = data;
+	}
+	
+	
+	public Object getResource() {
+		return resource;
+	}
+
+	public void setResource(Object resource) {
+		this.resource = resource;
+	}
 	
 
 	public String getSrcResult() {

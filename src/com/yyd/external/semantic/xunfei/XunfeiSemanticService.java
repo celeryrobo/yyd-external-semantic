@@ -16,9 +16,15 @@ import java.util.Map;
 
 import com.yyd.external.util.Http;
 import com.yyd.external.util.StringTool;
+import com.yyd.external.semantic.ExternalCommonBean;
 import com.yyd.external.semantic.ExternalSemanticError;
 import com.yyd.external.semantic.ExternalSemanticResult;
 import com.yyd.external.semantic.ExternalSemanticService;
+import com.yyd.external.semantic.resource.NewsResource;
+import com.yyd.external.semantic.resource.PoetryResource;
+import com.yyd.external.semantic.resource.StoryResource;
+import com.yyd.external.semantic.ExternalSemanticResult.OperationEx;
+import com.yyd.external.semantic.ExternalSemanticResult.ParamTypeEx;
 
 /**
  * 访问讯飞语义
@@ -112,6 +118,8 @@ public class XunfeiSemanticService implements ExternalSemanticService{
 			return;
 		}
 		
+		semanticResult.setData(new ExternalCommonBean());		
+		
 		String rcCode = obj.get("code").getAsString();
 		String desc  = obj.get("desc").getAsString();
 		String sid = obj.get("sid").getAsString();
@@ -190,74 +198,412 @@ public class XunfeiSemanticService implements ExternalSemanticService{
 		}
 		
 		//处理需要单独合成结果的语义
-		String serviceResult = parseServiceResult(semanticResult.getService(),semanticResult.getIntent(),result,semanticResult.getAnswer());
-		if(null != serviceResult) {
-			semanticResult.setAnswer(serviceResult);
-		}
+		parseServiceResult(semanticResult.getService(),semanticResult.getIntent(),result,semanticResult.getAnswer(),semanticResult);
 		
+		
+		semanticResult.getData().setText(semanticResult.getAnswer());
 		semanticResult.setRet(ExternalSemanticError.ERROR_SUCCESS);
 		semanticResult.setMsg(ExternalSemanticError.get(ExternalSemanticError.ERROR_SUCCESS));
+		if(semanticResult.getOperation() == null) {
+			semanticResult.setOperation(OperationEx.SPEAK);
+			semanticResult.setParamType(ParamTypeEx.T);
+		}
+		
 	}
 	
-	private String parseServiceResult(String service,String intent,String result,String answerResult) {
-		String answer = null;
-		switch(service) {
+	private void parseServiceResult(String service,String intent,String result,String answerResult,ExternalSemanticResult semanticResult) {
+			switch(service) {
 			case "stock":
 			{
-				answer = parseStockServiceResult(result);
+				parseStockServiceResult(result,semanticResult);
 				break;
 			}
 			case "translation":
 			{
-				answer = parseTranslationServiceResult(result);
+				parseTranslationServiceResult(result,semanticResult);
+				break;
 			}
 			case "weather":
 			{
-				answer = parseWeatherServiceResult(answerResult);
+				parseWeatherServiceResult(answerResult,semanticResult);
+				break;
+			}
+			case "holiday":
+			{
+				parseHolidayServiceResult(result,semanticResult);
+				break;
+			}
+			case "news":
+			{
+				parseNewsServiceResult(result,semanticResult);
+				break;
+			}
+			case "story":
+			{
+				parseStoryServiceResult(result,semanticResult);
+				break;
+			}
+			case "poetry":
+			{
+				parsePoetryServiceResult(result,semanticResult);
+				break;
+			}
+			case "idiom":
+			{
+				parseIdiomServiceResult(result,semanticResult);
+				break;
+			}
+			case "YYD.app_1":
+			case "YYD.robot_control":
+			{
+				parseYYDServiceResult(result,semanticResult);
+				break;
 			}
 			default:
 				break;
 		}
 		
-		return answer;
+	
 	}
 	
-	public String parseWeatherServiceResult(String result) {
-		if(null == result || result.isEmpty()) {
-			return null;
-		}
-		String answer = result;
-		answer = answer.replace("\"", "");
-		return answer;
+	private void  parseYYDServiceResult(String result,ExternalSemanticResult semanticResult) {
+		String service = semanticResult.getService();
+		service = service.replace("YYD.", "");
+		semanticResult.setService(service);
+		
+		semanticResult.setOperation(OperationEx.COMMAND);
+		semanticResult.setParamType(ParamTypeEx.TC);		
 	}
 	
-	public String  parseTranslationServiceResult(String result) {
-		String answer = null;		
-				
+	private void  parseIdiomServiceResult(String result,ExternalSemanticResult semanticResult) {
 		JsonObject obj = new JsonParser().parse(result).getAsJsonObject();
 		if(null == obj) {			
-			return null;
+			return;
 		}
 		
 		JsonObject dataObject = obj.get("data").getAsJsonObject();
 		if(null == dataObject) {
-			return null;
+			return;
+		}
+		JsonObject subDataObject = dataObject.get("data").getAsJsonObject();
+		if(null == subDataObject) {
+			return;
+		}
+		
+		
+		JsonArray resultArray = subDataObject.get("result").getAsJsonArray();
+		if(null == resultArray || resultArray.size() <= 0) {
+			return;
+		}
+		
+		//暂时只取第一条
+		String intent = semanticResult.getIntent();
+		if(null == intent) {
+			return;
+		}
+		
+		//查询成语和查询成语解释
+		if(intent.equalsIgnoreCase("QUERY") || intent.equalsIgnoreCase("INTERPRETATION_QUERY")) {
+			JsonObject dateObj = resultArray.get(0).getAsJsonObject();
+			String name = dateObj.get("name").getAsString();	
+			String text = dateObj.get("text").getAsString();	
+			semanticResult.setAnswer(name+","+text);
+		}
+		else if(intent.equalsIgnoreCase("SOURCE_QUERY")) {//查询成语出处
+			JsonObject dateObj = resultArray.get(0).getAsJsonObject();
+			String name = dateObj.get("name").getAsString();
+			String source = dateObj.get("source").getAsString();		
+			semanticResult.setAnswer(name+",出自"+source);
+		}
+		else if(intent.equalsIgnoreCase("SOLITAIRE")) {//成语接龙
+			JsonObject dateObj = resultArray.get(0).getAsJsonObject();
+			String name = dateObj.get("name").getAsString();					
+			semanticResult.setAnswer(name);
+		}
+		
+		semanticResult.setOperation(OperationEx.SPEAK);
+		semanticResult.setParamType(ParamTypeEx.T);		
+	}
+	
+	private void  parsePoetryServiceResult(String result,ExternalSemanticResult semanticResult) {
+		Map<String,Object> slot = semanticResult.getSlots();
+		if(null != slot) {
+			if(slot.containsKey("author")) {
+				Object value = slot.get("author");
+				slot.remove("author");
+				slot.put("poetryAuthor", value);
+			}
+			if(slot.containsKey("name")) {
+				Object value = slot.get("name");
+				slot.remove("name");
+				slot.put("poetryTitle", value);
+			}
+			if(slot.containsKey("keyword")) {
+				Object value = slot.get("keyword");
+				slot.remove("keyword");
+				slot.put("poetrySentence", value);
+			}
+		}
+		
+		
+		JsonObject obj = new JsonParser().parse(result).getAsJsonObject();
+		if(null == obj) {			
+			return;
+		}
+		
+		JsonObject dataObject = obj.get("data").getAsJsonObject();
+		if(null == dataObject) {
+			return;
+		}
+		JsonObject subDataObject = dataObject.get("data").getAsJsonObject();
+		if(null == subDataObject) {
+			return;
+		}
+		
+		
+		JsonArray resultArray = subDataObject.get("result").getAsJsonArray();
+		if(null == resultArray || resultArray.size() <= 0) {
+			return;
+		}
+		
+		//暂时只取第一条
+		JsonObject dateObj = resultArray.get(0).getAsJsonObject();
+		String dynasty = dateObj.get("dynasty").getAsString();
+		String author = dateObj.get("author").getAsString();	
+		String title = dateObj.get("title").getAsString();
+		String content = dateObj.get("content").getAsString();
+		Integer id = dateObj.get("id").getAsInt();
+		
+		PoetryResource resource = new PoetryResource();
+		resource.setAuthorName(author);
+		resource.setContent(content);
+		resource.setDynasty(dynasty);
+		resource.setTitle(title);
+		resource.setId(id);
+		semanticResult.setResource(resource);
+		
+		//判断具体的意图，迅飞将意图放在两个字段中表示
+		String answer = null;
+		Object queryField = slot.get("queryField");
+		Object queried = slot.get("queried");
+		
+		if(null != queryField) {
+			String field = queryField.toString();
+			if(field.equalsIgnoreCase("lastSent")) {
+				answer = title+"的最后一句是"+content;
+			}
+			else if(field.equalsIgnoreCase("firstSent")) {
+				answer = title+"的第一句是"+content;
+			}
+			else if(field.equalsIgnoreCase("nextSent")) {
+				String keyword = slot.get("poetrySentence").toString();
+				answer = keyword+"的下一句是"+content;
+			}
+			else if(field.equalsIgnoreCase("pastSent")) {
+				String keyword = slot.get("poetrySentence").toString();
+				answer = keyword+"的上一句是"+content;
+			}
+			
+			//此类意图下，没有诗文的正文
+			resource.setContent(null);
+		}
+		else if(null != queried) {
+			String field = queried.toString();
+			if(field.equalsIgnoreCase("author")) {
+				answer = title+"的作者是"+author;
+			}
+			else if(field.equalsIgnoreCase("dynasty")) {
+				answer = title+"的朝代是"+dynasty;
+			}
+		}
+		else {
+			StringBuilder build = new StringBuilder();
+			if(null != title) {
+				build.append(title+" ");
+			}
+			if(null != author) {
+				build.append(author+" ");
+			}
+			build.append(content);			
+			answer = build.toString();	
+		}
+		
+		semanticResult.setAnswer(answer);
+		
+		semanticResult.setOperation(OperationEx.SPEAK);
+		semanticResult.setParamType(ParamTypeEx.T);		
+	}
+	
+	
+	private void  parseStoryServiceResult(String result,ExternalSemanticResult semanticResult) {
+		Map<String,Object> slot = semanticResult.getSlots();
+		if(null != slot) {
+			if(slot.containsKey("name")) {
+				Object value = slot.get("name");
+				slot.remove("name");
+				slot.put("storyName", value);
+			}
+		}
+		
+		JsonObject obj = new JsonParser().parse(result).getAsJsonObject();
+		if(null == obj) {			
+			return;
+		}
+		
+		JsonObject dataObject = obj.get("data").getAsJsonObject();
+		if(null == dataObject) {
+			return;
+		}
+		JsonObject subDataObject = dataObject.get("data").getAsJsonObject();
+		if(null == subDataObject) {
+			return;
+		}
+		
+		
+		JsonArray resultArray = subDataObject.get("result").getAsJsonArray();
+		if(null == resultArray || resultArray.size() <= 0) {
+			return;
+		}
+		
+		//暂时只取第一条故事
+		JsonObject dateObj = resultArray.get(0).getAsJsonObject();
+		String name = dateObj.get("name").getAsString();
+		String url = dateObj.get("playUrl").getAsString();				
+		semanticResult.getData().setUrl(url);
+		
+		StoryResource resource = new StoryResource();
+		resource.setStory(name);
+		resource.setUrl(url);
+		semanticResult.setResource(resource);
+		
+		semanticResult.setOperation(OperationEx.PLAY);
+		semanticResult.setParamType(ParamTypeEx.TU);
+		
+		String answer = "开始播放"+name;	
+		semanticResult.setAnswer(answer);		
+	}
+	
+	private void  parseNewsServiceResult(String result,ExternalSemanticResult semanticResult) {
+		JsonObject obj = new JsonParser().parse(result).getAsJsonObject();
+		if(null == obj) {			
+			return;
+		}
+		
+		JsonObject dataObject = obj.get("data").getAsJsonObject();
+		if(null == dataObject) {
+			return;
+		}
+		JsonObject subDataObject = dataObject.get("data").getAsJsonObject();
+		if(null == subDataObject) {
+			return;
+		}
+		
+		
+		JsonArray resultArray = subDataObject.get("result").getAsJsonArray();
+		if(null == resultArray || resultArray.size() <= 0) {
+			return;
+		}
+		
+		//暂时只取第一条新闻
+		JsonObject dateObj = resultArray.get(0).getAsJsonObject();
+		String title = dateObj.get("title").getAsString();
+		String catetory = dateObj.get("category").getAsString();
+		String url = dateObj.get("url").getAsString();
+		String keyWords = dateObj.get("keyWords").getAsString();
+		String publishDateTime = dateObj.get("publishDateTime").getAsString();
+		
+		semanticResult.getData().setText(title);	
+		semanticResult.getData().setUrl(url);
+		
+		NewsResource resource = new NewsResource();
+		resource.setKeyWords(keyWords);
+		resource.setPublishDateTime(publishDateTime);
+		resource.setTitle(title);
+		resource.setUrl(url);
+		semanticResult.setResource(resource);
+		
+		semanticResult.setOperation(OperationEx.PLAY);
+		semanticResult.setParamType(ParamTypeEx.TU);
+
+		String answer = null;
+		answer = "为您播放"+catetory+"新闻";
+		semanticResult.setAnswer(answer);		
+	}
+	
+	private void  parseHolidayServiceResult(String result,ExternalSemanticResult semanticResult) {
+		JsonObject obj = new JsonParser().parse(result).getAsJsonObject();
+		if(null == obj) {			
+			return;
+		}
+		
+		JsonObject dataObject = obj.get("data").getAsJsonObject();
+		if(null == dataObject) {
+			return;
+		}
+		JsonObject subDataObject = dataObject.get("data").getAsJsonObject();
+		if(null == subDataObject) {
+			return;
+		}
+		
+		
+		JsonArray resultArray = subDataObject.get("result").getAsJsonArray();
+		if(null == resultArray || resultArray.size() <= 0) {
+			return;
+		}
+		
+		StringBuilder build = new StringBuilder();
+		for(int i=0;i < resultArray.size();i++) {
+			JsonObject dateObj = resultArray.get(i).getAsJsonObject();
+			String name = dateObj.get("name").getAsString();
+			String holidayStartDate = dateObj.get("holidayStartDate").getAsString();
+			String holidayEndDate = dateObj.get("holidayEndDate").getAsString();
+			String duration = dateObj.get("duration").getAsString();
+			String desc = name+","+holidayStartDate+"至"+holidayEndDate+",共"+duration+"天";
+			build.append(desc);
+			if(i != resultArray.size()-1) {
+				build.append(";");
+			}			
+		}
+
+		String answer = null;		
+		answer = build.toString();
+		semanticResult.setAnswer(answer);
+	}
+	
+	private void parseWeatherServiceResult(String result,ExternalSemanticResult semanticResult) {
+		if(null == result || result.isEmpty()) {
+			return;
+		}
+		String answer = result;
+		answer = answer.replace("\"", "");
+		semanticResult.setAnswer(answer);		
+	}
+	
+	private void  parseTranslationServiceResult(String result,ExternalSemanticResult semanticResult) {
+		JsonObject obj = new JsonParser().parse(result).getAsJsonObject();
+		if(null == obj) {			
+			return ;
+		}
+		
+		JsonObject dataObject = obj.get("data").getAsJsonObject();
+		if(null == dataObject) {
+			return;
 		}
 		
 		JsonObject subDataObject = dataObject.get("data").getAsJsonObject();
 		if(null == subDataObject) {
-			return null;
+			return;
 		}
 		
 		JsonArray resultArray = subDataObject.get("result").getAsJsonArray();
 		if(null == resultArray || resultArray.size() <= 0) {
-			return null;
+			return;
 		}
 		
 		JsonObject first = resultArray.get(0).getAsJsonObject();
+		String answer = null;	
 		answer = first.get("translated").getAsString();
-		
-		return answer;
+		semanticResult.setAnswer(answer);		
 	}
 	
 	/**
@@ -265,18 +611,18 @@ public class XunfeiSemanticService implements ExternalSemanticService{
 	 * @param result
 	 * @return
 	 */
-	private String parseStockServiceResult(String result) {
+	private void parseStockServiceResult(String result,ExternalSemanticResult semanticResult) {
 		String answer = null;		
 		StringBuilder build = new StringBuilder();
 		
 		JsonObject obj = new JsonParser().parse(result).getAsJsonObject();
 		if(null == obj) {			
-			return null;
+			return;
 		}
 		
 		JsonObject dataObject = obj.get("data").getAsJsonObject();
 		if(null == dataObject) {
-			return null;
+			return;
 		}
 		
 		//提取intent和slot等语义信息，主要是为提取股票名称
@@ -305,7 +651,7 @@ public class XunfeiSemanticService implements ExternalSemanticService{
 		}
 		else
 		{
-			return null;
+			return;
 		}
 		
 		String stockName = slots.get("name").toString();
@@ -359,8 +705,7 @@ public class XunfeiSemanticService implements ExternalSemanticService{
 		}
 		
 		answer = build.toString();
-		
-		return answer;
+		semanticResult.setAnswer(answer);		
 	}
 	
 	 /**利用MD5进行加密

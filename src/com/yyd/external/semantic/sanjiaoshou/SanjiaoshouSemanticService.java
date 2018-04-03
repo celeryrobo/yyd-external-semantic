@@ -7,6 +7,7 @@ import org.json.JSONObject;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.yyd.external.semantic.ExternalCommonBean;
 import com.yyd.external.semantic.ExternalSemanticError;
 import com.yyd.external.semantic.ExternalSemanticResult;
 import com.yyd.external.semantic.ExternalSemanticService;
@@ -53,6 +54,9 @@ public class SanjiaoshouSemanticService implements ExternalSemanticService{
 		result.setService("chat");
 		result.setOperation(OperationEx.SPEAK);
 		result.setParamType(ParamTypeEx.T);
+		
+		result.setData(new ExternalCommonBean());
+		result.getData().setText(result.getAnswer());
 		
 		return result;
 	}
